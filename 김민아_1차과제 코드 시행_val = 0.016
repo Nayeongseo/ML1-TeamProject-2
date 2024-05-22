@@ -1,0 +1,56 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import welch
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+
+# train_data와 test_data 불러오기
+train_data = np.load(r"C:\Users\home\Desktop/train.npy", allow_pickle=True)
+test_data = np.load(r"C:\Users\home\Desktop/test.npy", allow_pickle=True)
+
+x_train = train_data.item().get('input')
+y_train = train_data.item().get('label')
+x_test = test_data.item().get('input')
+y_test = test_data.item().get('label')
+
+# 주파수 및 PSD 계산을 위한 함수 정의
+def calculate_psd(data, fs=256):
+    psds = []
+    for sample in data:
+        freqs, psd = welch(sample.flatten(), fs=fs, nperseg=256)  # 각 샘플에 대해 PSD 계산
+        psds.append(psd)
+    return freqs, np.array(psds)
+
+# train 데이터와 test 데이터의 PSD 계산
+freqs_train, psds_train = calculate_psd(x_train)
+freqs_test, psds_test = calculate_psd(x_test)
+
+
+# 데이터를 훈련 데이터와 검증 데이터로 나누기
+x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=42)
+
+# train 데이터의 PSD 계산 및 그래프 표시
+freqs_train, psds_train = calculate_psd(x_train)
+
+# validation 데이터의 PSD 계산 및 그래프 표시
+freqs_val, psds_val = calculate_psd(x_val)
+
+# Random Forest 모델 생성
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+
+# 훈련 데이터로 모델 훈련
+rf_model.fit(psds_train.reshape(psds_train.shape[0], -1), y_train)
+
+# 검증 데이터로 예측
+y_val_pred = rf_model.predict(psds_val.reshape(psds_val.shape[0], -1))
+
+# 검증 데이터 정확도 계산
+val_accuracy = accuracy_score(y_val, y_val_pred)
+print("Validation Accuracy:", val_accuracy)
+
+# 테스트 데이터로 예측
+y_test_pred = rf_model.predict(psds_test.reshape(psds_test.shape[0], -1))
+
+# 예측 결과 출력
+print("테스트 데이터에 대한 예측 결과:", y_test_pred)
